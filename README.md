@@ -1,12 +1,10 @@
 # 🚗 SafeRide_AI: Driver Safety Monitoring System
 
-## Overview
+## 📖 Overview
 
 SafeRide_AI is an AI-powered safety system for ride-hailing services like Ola and Uber. It uses YOLO-based computer vision to monitor driver attention, drowsiness levels, phone usage, and speech-to-text analysis to detect offensive or unsafe language, ensuring passenger safety in real-time.
 
-## 📖 Overview
-
-SafeRide_AI is a **hybrid computer vision and audio processing system** that uses your PC webcam to track a driver's **attention level** and **drowsiness** in real-time. It combines **YOLOv8** for object detection with **MediaPipe** for face and eye analysis to provide comprehensive driver monitoring.
+It is a **hybrid computer vision and audio processing system** that uses your dashcam to track a driver's behaviour in real-time. It combines **YOLOv8** for object detection with **MediaPipe** for face and eye analysis to provide comprehensive driver monitoring.
 
 The system outputs a continuous **attention score (0–100)** that reflects how focused the driver is, adjusting dynamically based on various behavioral indicators. At the end of each ride, it calculates an **average attention score** to provide a **final driver rating** that can help passengers make informed decisions about driver selection.
 
@@ -32,7 +30,15 @@ The system outputs a continuous **attention score (0–100)** that reflects how 
 - **Performance Report**: Detailed driver performance report with rating and statistics
 - **Ride Statistics**: Duration, attention readings count, and performance metrics
 
-## ⚙️ System Pipeline
+## 🖼️ Screenshots
+
+### Dashboard GUI
+![Dashboard GUI](datasets/custom_dataset/images/train/Dashboard_GUI.png)
+
+### Terminal Output
+![Terminal Output](datasets/custom_dataset/images/train/Terminal_Output.png)
+
+## 🔄 System Workflow
 
 1. **Frame Capture**: Captures live webcam feed using OpenCV
 2. **YOLOv8 Object Detection**: Detects distractive objects (phones, books, laptops, etc.)
@@ -117,26 +123,8 @@ python src/main.py
 ### Help Phrases Detected
 
 The system recognizes the following help-related phrases:
-- help
-- police
-- stop the car
-- stop car
-- emergency
-- danger
-- call police
-- get help
-- need help
-- help me
-- pull over
-- stop the vehicle
-- emergency stop
-- dangerous
-- unsafe
-- scared
-- afraid
-- threat
-- assault
-- harassment
+
+**help, police, stop the car, stop car, emergency, danger, call police, get help, need help, help me, pull over, stop the vehicle, emergency stop, dangerous, unsafe, scared, afraid, threat, assault, harassment**
 
 ## 📊 Scoring System (Out of 100)
 
