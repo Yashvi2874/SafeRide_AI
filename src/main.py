@@ -1,0 +1,105 @@
+import cv2
+import threading
+from gui import HybridAttentionSpeechGUI
+from video import VideoCapture
+from audio import SpeechRecognizer
+from detection import detect_attention_and_drowsiness
+import tkinter as tk
+import os
+
+# Main application class
+class HybridAttentionSpeechApp:
+    def __init__(self):
+        self.video_stream = VideoCapture()
+        
+        # Initialize speech recognizer
+        self.speech_recognizer = SpeechRecognizer(
+            offensive_words=[
+                "idiot", "stupid", "danger", "stop car",
+                "kill", "rape", "murder", "assault", "threat",
+                "shoot", "gun", "attack", "hurt"
+            ],
+            webhook_url=os.environ.get("OFFENSIVE_ALERT_WEBHOOK"),
+            phrase_time_limit=3,
+            silence_flush_sec=0.8,
+            fuzzy_threshold=0.75,
+            alert_cooldown=60
+        )
+        self.speech_recognizer.start()
+        
+        # Create GUI
+        self.root = tk.Tk()
+        self.gui = HybridAttentionSpeechGUI(self.root)
+        
+        # Control flag
+        self.running = True
+
+    # Process video stream
+    def start_video_stream(self):
+        while self.running:
+            frame = self.video_stream.get_frame()
+            if frame is not None:
+                # Process frame and get attention score, drowsiness alert, and yawning status
+                result = detect_attention_and_drowsiness(frame, self.speech_recognizer)
+                
+                # Handle both old and new return value formats
+                if len(result) == 4:
+                    processed_frame, attention_score, drowsiness_alert, yawning_detected = result
+                else:
+                    # Old format (3 values)
+                    processed_frame, attention_score, drowsiness_alert = result
+                    yawning_detected = False
+                
+                # Update GUI with attention and drowsiness data
+                self.gui.update_attention(attention_score)
+                self.gui.update_drowsiness(drowsiness_alert)
+                
+                # Display the processed frame
+                cv2.imshow("Enhanced Attention Tracking System", processed_frame)
+            
+            # Use a shorter wait time for more responsive UI
+            if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
+                self.running = False
+                break
+
+    # Process audio transcription
+    def start_audio_transcription(self):
+        while self.running:
+            # The speech recognizer updates its attributes automatically
+            # We just need to read them and update the GUI
+            speech_text = self.speech_recognizer.speech_text or self.speech_recognizer.partial_text or ""
+            offensive_detected = self.speech_recognizer.offensive_detected
+            
+            # Update GUI with transcription data
+            self.gui.update_transcription(speech_text)
+            if offensive_detected:
+                self.gui.show_offensive_warning("Offensive language detected!")
+            
+            # Small delay to prevent excessive CPU usage
+            cv2.waitKey(100)
+
+    # Run the application
+    def run(self):
+        # Start video processing in a separate thread
+        video_thread = threading.Thread(target=self.start_video_stream)
+        video_thread.daemon = True
+        video_thread.start()
+        
+        # Start audio processing in a separate thread
+        audio_thread = threading.Thread(target=self.start_audio_transcription)
+        audio_thread.daemon = True
+        audio_thread.start()
+        
+        # Run GUI in main thread
+        self.root.mainloop()
+        
+        # Clean up when GUI is closed
+        self.running = False
+        self.speech_recognizer.stop()
+        self.video_stream.release()
+        cv2.destroyAllWindows()
+
+# Main entry point
+if __name__ == "__main__":
+    app = HybridAttentionSpeechApp()
+    app.run()
