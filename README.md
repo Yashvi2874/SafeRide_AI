@@ -2,21 +2,6 @@
 
 An AI-powered safety system for ride-hailing services like Ola and Uber. It uses YOLO-based computer vision to monitor driver attention, drowsiness levels, phone usage, and yawning detection, and speech-to-text analysis to detect offensive or unsafe language, ensuring passenger safety in real-time.
 
-## 📋 Table of Contents
-- [Overview](#overview)
-- [Features](#features)
-- [System Pipeline](#system-pipeline)
-- [Technologies Used](#technologies-used)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Controls](#controls)
-- [How It Works](#how-it-works)
-- [Scoring System](#scoring-system)
-- [Modules](#modules)
-- [Requirements](#requirements)
-- [License](#license)
-- [Author](#author)
-
 ## 📖 Overview
 
 SafeRide_AI is a **hybrid computer vision and audio processing system** that uses your PC webcam to track a driver's **attention level** and **drowsiness** in real-time. It combines **YOLOv8** for object detection with **MediaPipe** for face and eye analysis to provide comprehensive driver monitoring.
