@@ -10,19 +10,15 @@ class HybridAttentionSpeechGUI:
         self.master = master
         master.title("🚗 SafeRide AI - Driver Monitoring System")
         master.geometry("1200x700")
-        master.minsize(1000, 600)  # Minimum window size
+        master.minsize(800, 500)  # Minimum window size
         master.resizable(True, True)
         master.configure(bg="#121212")  # Dark background
 
         # Configure styles for dark theme
         self.master.option_add("*Font", "Helvetica 10")
         
-        # Create main frame
-        self.main_frame = tk.Frame(master, bg="#121212")
-        self.main_frame.pack(fill=tk.BOTH, expand=True)
-
         # Header frame
-        self.header_frame = tk.Frame(self.main_frame, bg="#121212", pady=10)
+        self.header_frame = tk.Frame(master, bg="#121212", pady=10)
         self.header_frame.pack(fill=tk.X)
         self.header_frame.columnconfigure(0, weight=1)
         
@@ -46,34 +42,11 @@ class HybridAttentionSpeechGUI:
         )
         self.subtitle_label.pack()
 
-        # Create a canvas and scrollbar for the content
-        self.canvas = tk.Canvas(self.main_frame, bg="#121212", highlightthickness=0)
-        self.scrollbar = tk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview)
-        
-        # Create scrollable frame
-        self.scrollable_frame = tk.Frame(self.canvas, bg="#121212")
-
-        # Configure scrolling
-        self.scrollable_frame.bind(
-            "<Configure>",
-            self._on_frame_configure
-        )
-
-        self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        # Pack canvas and scrollbar
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
-
-        # Bind mousewheel to canvas for scrolling
-        self._bind_scroll_events()
-
-        # Main content frame with two columns inside scrollable frame
-        self.content_frame = tk.Frame(self.scrollable_frame, bg="#121212")
+        # Main content frame with two columns
+        self.content_frame = tk.Frame(master, bg="#121212")
         self.content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-        # Configure grid weights for responsive resizing
+        # Configure grid weights for responsive resizing - EQUAL weights for both columns
         self.content_frame.columnconfigure(0, weight=1)  # Video column
         self.content_frame.columnconfigure(1, weight=1)  # Info column
         self.content_frame.rowconfigure(0, weight=1)
@@ -99,8 +72,8 @@ class HybridAttentionSpeechGUI:
         )
         self.video_title.grid(row=0, column=0, pady=(10, 5), sticky="ew")
         
-        # Video display label
-        self.video_label = tk.Label(self.video_frame, bg="#000000")
+        # Video display label with centered content
+        self.video_label = tk.Label(self.video_frame, bg="#000000", anchor="center")
         self.video_label.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         
         # Right column - Information and alerts
@@ -175,20 +148,20 @@ class HybridAttentionSpeechGUI:
         self.transcription_frame = tk.Frame(self.info_column, bg="#1E1E1E", relief=tk.RAISED, bd=1)
         self.transcription_frame.grid(row=2, column=0, sticky="nsew", pady=(0, 10))
         self.transcription_frame.columnconfigure(0, weight=1)
-        self.transcription_frame.rowconfigure(1, weight=1)
+        self.transcription_frame.rowconfigure(1, weight=0)  # Don't expand automatically
         
         self.transcription_title = tk.Label(
             self.transcription_frame, 
-            text="🎙️ SPEECH TRANSCRIPTION", 
+            text="SPEECH TRANSCRIPTION", 
             font=("Helvetica", 12, "bold"), 
             fg="#4FC3F7", 
             bg="#1E1E1E"
         )
         self.transcription_title.pack(pady=(10, 5))
 
-        # Scrollable text area for transcription
+        # Scrollable text area for transcription with fixed height
         self.transcription_text_frame = tk.Frame(self.transcription_frame, bg="#1E1E1E")
-        self.transcription_text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        self.transcription_text_frame.pack(fill=tk.BOTH, expand=False, padx=10, pady=(0, 10))
         self.transcription_text_frame.columnconfigure(0, weight=1)
         self.transcription_text_frame.rowconfigure(0, weight=1)
         
@@ -200,7 +173,8 @@ class HybridAttentionSpeechGUI:
             fg="#FFFFFF",
             insertbackground="#FFFFFF",
             relief=tk.FLAT,
-            bd=2
+            bd=2,
+            height=8  # Fixed height to minimize space
         )
         self.transcription_text.grid(row=0, column=0, sticky="nsew")
 
@@ -212,7 +186,7 @@ class HybridAttentionSpeechGUI:
         # Offensive warning label - VISIBLE BY DEFAULT
         self.offensive_warning_label = tk.Label(
             self.alerts_frame, 
-            text="🛡️ Monitoring for offensive language", 
+            text="Monitoring for offensive language", 
             font=("Helvetica", 16, "bold"), 
             fg="#4FC3F7", 
             bg="#1E1E1E",
@@ -226,7 +200,7 @@ class HybridAttentionSpeechGUI:
         # Help warning label
         self.help_warning_label = tk.Label(
             self.alerts_frame, 
-            text="🆘 Monitoring for help requests", 
+            text="Monitoring for help requests", 
             font=("Helvetica", 16, "bold"), 
             fg="#4FC3F7", 
             bg="#1E1E1E",
@@ -317,13 +291,17 @@ class HybridAttentionSpeechGUI:
             self.transcription_text.see(tk.END)
             # Limit the number of lines to prevent memory issues
             lines = self.transcription_text.get("1.0", tk.END).splitlines()
-            if len(lines) > 100:  # Keep only the last 100 lines
+            if len(lines) > 30:  # Keep only the last 30 lines to minimize space
                 self.transcription_text.delete("1.0", "2.0")
             # Highlight the new line
             self.transcription_text.tag_configure("recent", background="#333333")
             self.transcription_text.tag_add("recent", "end-2l", "end-1l")
+            
+            # Auto-adjust height based on content (between 8-12 lines)
+            line_count = min(max(len(lines), 8), 12)
+            self.transcription_text.config(height=line_count)
 
-    # Update video display
+    # Update video display with responsive sizing
     def update_video(self, frame):
         # Convert the frame to RGB format
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -331,22 +309,32 @@ class HybridAttentionSpeechGUI:
         # Convert to PIL Image
         pil_image = Image.fromarray(frame_rgb)
         
-        # Resize image to fit the label while maintaining aspect ratio
+        # Get the video label dimensions
         label_width = self.video_label.winfo_width()
         label_height = self.video_label.winfo_height()
         
-        if label_width > 1 and label_height > 1:  # Check if label has been rendered
-            # Calculate aspect ratio
+        # Only resize if label has been rendered and has valid dimensions
+        if label_width > 1 and label_height > 1:
+            # Calculate aspect ratio of the image
             img_width, img_height = pil_image.size
             aspect_ratio = img_width / img_height
             
-            # Calculate new dimensions
-            if label_width / label_height > aspect_ratio:
-                new_height = label_height
+            # Calculate new dimensions to fit within label while maintaining aspect ratio
+            # But ensure we don't exceed half the window width
+            window_width = self.master.winfo_width()
+            max_width = min(label_width, window_width // 2 - 30)  # Half window width minus padding
+            max_height = label_height
+            
+            if max_width / max_height > aspect_ratio:
+                new_height = min(max_height, label_height)
                 new_width = int(aspect_ratio * new_height)
             else:
-                new_width = label_width
+                new_width = min(max_width, label_width)
                 new_height = int(new_width / aspect_ratio)
+            
+            # Ensure minimum size but allow it to scale down
+            new_width = max(100, min(new_width, max_width))
+            new_height = max(75, min(new_height, max_height))
             
             # Resize the image
             pil_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
@@ -356,6 +344,7 @@ class HybridAttentionSpeechGUI:
         
         # Update the label
         self.video_label.configure(image=self.photo_image)
+        self.video_label.configure(anchor="center")
 
     # Show offensive language warning
     def show_offensive_warning(self, message):
@@ -382,7 +371,7 @@ class HybridAttentionSpeechGUI:
             text="🆘 " + message,
             font=("Helvetica", 20, "bold"),
             fg="#FFFFFF",
-            bg="#FF5722",  # Bright orange
+            bg="#FF5722",
             relief=tk.RAISED,
             bd=5
         )
@@ -404,7 +393,7 @@ class HybridAttentionSpeechGUI:
     # Clear offensive warning - MAKE IT VISIBLE AGAIN
     def _clear_offensive_warning(self):
         self.offensive_warning_label.config(
-            text="🛡️ Monitoring for offensive language", 
+            text="Monitoring for offensive language", 
             font=("Helvetica", 16, "bold"), 
             fg="#4FC3F7", 
             bg="#1E1E1E",
@@ -416,7 +405,7 @@ class HybridAttentionSpeechGUI:
     # Clear help warning - MAKE IT VISIBLE AGAIN
     def _clear_help_warning(self):
         self.help_warning_label.config(
-            text="🆘 Monitoring for help requests", 
+            text="Monitoring for help requests", 
             font=("Helvetica", 16, "bold"), 
             fg="#4FC3F7", 
             bg="#1E1E1E",
@@ -425,59 +414,11 @@ class HybridAttentionSpeechGUI:
         )
         self.help_warning_label.grid(row=1, column=0, sticky="ew", pady=5)
     
-    # Configure scroll region
-    def _on_frame_configure(self, event=None):
-        # Update the scroll region to encompass the inner frame
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        
-        # Also update the width of the window to match the canvas width
-        canvas_width = self.canvas.winfo_width()
-        if canvas_width > 1:  # Make sure canvas has been rendered
-            self.canvas.itemconfig(self.canvas_window, width=canvas_width)
-
-    # Bind scroll events
-    def _bind_scroll_events(self):
-        # For Windows and MacOS
-        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
-        # For Linux
-        self.canvas.bind("<Button-4>", self._on_mousewheel)
-        self.canvas.bind("<Button-5>", self._on_mousewheel)
-        
-        # Bind to all child widgets
-        self.scrollable_frame.bind("<MouseWheel>", self._on_mousewheel)
-        self.scrollable_frame.bind("<Button-4>", self._on_mousewheel)
-        self.scrollable_frame.bind("<Button-5>", self._on_mousewheel)
-        
-        # Bind to the main window for resize events
-        self.master.bind("<Configure>", self._on_window_resize)
-
-    # Handle mousewheel scrolling
-    def _on_mousewheel(self, event):
-        # Only scroll if content is larger than view
-        if self.canvas.bbox("all") and self.canvas.bbox("all")[3] > self.canvas.winfo_height():
-            # For Windows
-            if event.num == 5 or event.delta < 0:
-                self.canvas.yview_scroll(1, "units")
-            elif event.num == 4 or event.delta > 0:
-                self.canvas.yview_scroll(-1, "units")
-            # For Linux
-            elif event.num == 4:
-                self.canvas.yview_scroll(-1, "units")
-            elif event.num == 5:
-                self.canvas.yview_scroll(1, "units")
-
-    # Handle window resize
-    def _on_window_resize(self, event):
-        # Only respond to the main window resize, not child widgets
-        if event.widget == self.master:
-            self._on_frame_configure()
 
     def on_resize(self, event):
         # Update progress bar when window is resized
         if hasattr(self, 'last_attention') and event.widget == self.master:
             self.master.after_idle(self._update_attention_progress, self.last_attention)
-    
-# Main entry point
 
 # Main entry point
 def main():
