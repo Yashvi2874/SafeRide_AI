@@ -240,11 +240,10 @@ class HybridAttentionSpeechGUI:
         
         # Initialize variables for video display
         self.photo_image = None
-        
-        # Initialize last attention value
+        self.last_frame = None
         self.last_attention = 0
         
-        # Bind resize event to update progress bar
+        # Bind resize event to update progress bar and video
         self.master.bind('<Configure>', self.on_resize)
 
     # Update attention display
@@ -330,48 +329,58 @@ class HybridAttentionSpeechGUI:
 
     # Update video display with responsive sizing
     def update_video(self, frame):
+        # Store frame for potential resize updates
+        self.last_frame = frame
+        
         # Convert the frame to RGB format
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
         # Convert to PIL Image
         pil_image = Image.fromarray(frame_rgb)
         
-        # Get the video label dimensions
-        label_width = self.video_label.winfo_width()
-        label_height = self.video_label.winfo_height()
+        # Get the main window dimensions
+        window_width = self.master.winfo_width()
+        window_height = self.master.winfo_height()
         
-        # Only resize if label has been rendered and has valid dimensions
-        if label_width > 1 and label_height > 1:
-            # Calculate aspect ratio of the image
-            img_width, img_height = pil_image.size
-            aspect_ratio = img_width / img_height
-            
-            # Calculate new dimensions to fit within label while maintaining aspect ratio
-            # But ensure we don't exceed half the window width
-            window_width = self.master.winfo_width()
-            max_width = min(label_width, window_width // 2 - 30)  # Half window width minus padding
-            max_height = label_height
-            
-            if max_width / max_height > aspect_ratio:
-                new_height = min(max_height, label_height)
-                new_width = int(aspect_ratio * new_height)
-            else:
-                new_width = min(max_width, label_width)
-                new_height = int(new_width / aspect_ratio)
-            
-            # Ensure minimum size but allow it to scale down
-            new_width = max(100, min(new_width, max_width))
-            new_height = max(75, min(new_height, max_height))
-            
-            # Resize the image
-            pil_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        # Calculate target width as exactly half of window width
+        target_width = max(320, window_width // 2 - 20)  # Half window width minus small padding
+        
+        # Calculate target height based on available space
+        # Reserve space for other UI elements
+        reserved_height = 200  # Space for header, attention bar, status, transcription, alerts
+        target_height = max(240, window_height - reserved_height)
+        
+        # Calculate aspect ratio of the image
+        img_width, img_height = pil_image.size
+        aspect_ratio = img_width / img_height
+        
+        # Calculate new dimensions to maintain aspect ratio
+        if target_width / target_height > aspect_ratio:
+            new_height = min(target_height, int(target_width / aspect_ratio))
+            new_width = int(aspect_ratio * new_height)
+        else:
+            new_width = min(target_width, target_width)
+            new_height = int(new_width / aspect_ratio)
+        
+        # Ensure minimum size but allow it to scale properly
+        new_width = max(320, new_width)
+        new_height = max(240, new_height)
+        
+        # Resize the image
+        pil_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
         # Convert to PhotoImage
         self.photo_image = ImageTk.PhotoImage(pil_image)
         
-        # Update the label
+        # Update the label and ensure it's centered
         self.video_label.configure(image=self.photo_image)
         self.video_label.configure(anchor="center")
+        
+        # Ensure the video label is properly configured for centering
+        self.video_label.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        
+        # Force update to ensure proper display
+        self.video_label.update_idletasks()
 
     # Show offensive language warning
     def show_offensive_warning(self, message):
@@ -619,8 +628,7 @@ class HybridAttentionSpeechGUI:
         self.scrollable_frame.bind("<Button-4>", self._on_mousewheel)
         self.scrollable_frame.bind("<Button-5>", self._on_mousewheel)
         
-        # Bind to the main window for resize events
-        self.master.bind("<Configure>", self._on_window_resize)
+        # Bind to the main window for resize events (already bound in __init__)
 
     # Handle mousewheel scrolling
     def _on_mousewheel(self, event):
@@ -643,11 +651,20 @@ class HybridAttentionSpeechGUI:
         # Only respond to the main window resize, not child widgets
         if event.widget == self.master:
             self._on_frame_configure()
+            # Update video if we have a frame stored
+            if hasattr(self, 'last_frame') and self.last_frame is not None:
+                # Use after_idle to ensure the resize is complete before updating
+                self.master.after_idle(self.update_video, self.last_frame)
 
     def on_resize(self, event):
         # Update progress bar when window is resized
         if hasattr(self, 'last_attention') and event.widget == self.master:
             self.master.after_idle(self._update_attention_progress, self.last_attention)
+        
+        # Update video if we have a frame stored and the event is from the main window
+        if hasattr(self, 'last_frame') and self.last_frame is not None and event.widget == self.master:
+            # Use after_idle to ensure the resize is complete before updating
+            self.master.after_idle(self.update_video, self.last_frame)
 
 # Main entry point
 def main():
