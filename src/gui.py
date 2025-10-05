@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import scrolledtext, ttk
+from tkinter import scrolledtext, ttk, messagebox
 import threading
 from PIL import Image, ImageTk
 import cv2
@@ -17,8 +17,35 @@ class HybridAttentionSpeechGUI:
         # Configure styles for dark theme
         self.master.option_add("*Font", "Helvetica 10")
         
+        # Create main frame with scrollbar
+        self.main_frame = tk.Frame(master, bg="#121212")
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Create canvas and scrollbar
+        self.canvas = tk.Canvas(self.main_frame, bg="#121212", highlightthickness=0)
+        self.scrollbar = tk.Scrollbar(self.main_frame, orient="vertical", command=self.canvas.yview)
+        
+        # Create scrollable frame inside canvas
+        self.scrollable_frame = tk.Frame(self.canvas, bg="#121212")
+        
+        # Configure scrolling
+        self.scrollable_frame.bind(
+            "<Configure>",
+            self._on_frame_configure
+        )
+        
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        # Pack canvas and scrollbar
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+        
+        # Bind mousewheel scrolling
+        self._bind_scroll_events()
+        
         # Header frame
-        self.header_frame = tk.Frame(master, bg="#121212", pady=10)
+        self.header_frame = tk.Frame(self.scrollable_frame, bg="#121212", pady=10)
         self.header_frame.pack(fill=tk.X)
         self.header_frame.columnconfigure(0, weight=1)
         
@@ -43,7 +70,7 @@ class HybridAttentionSpeechGUI:
         self.subtitle_label.pack()
 
         # Main content frame with two columns
-        self.content_frame = tk.Frame(master, bg="#121212")
+        self.content_frame = tk.Frame(self.scrollable_frame, bg="#121212")
         self.content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         # Configure grid weights for responsive resizing - EQUAL weights for both columns
@@ -65,7 +92,7 @@ class HybridAttentionSpeechGUI:
         
         self.video_title = tk.Label(
             self.video_frame, 
-            text="📹 LIVE DRIVER MONITORING", 
+            text="LIVE DRIVER MONITORING", 
             font=("Helvetica", 14, "bold"), 
             fg="#4FC3F7", 
             bg="#1E1E1E"
@@ -414,6 +441,208 @@ class HybridAttentionSpeechGUI:
         )
         self.help_warning_label.grid(row=1, column=0, sticky="ew", pady=5)
     
+    # Show final driver score dialog
+    def show_final_score(self, score, rating, duration, readings, offensive_count=0):
+        # Create a new top-level window for the final score
+        score_window = tk.Toplevel(self.master)
+        score_window.title("Driver Performance Report")
+        score_window.geometry("400x350")  # Increased height to accommodate offensive count
+        score_window.configure(bg="#121212")
+        score_window.resizable(False, False)
+        
+        # Center the window
+        score_window.transient(self.master)
+        score_window.grab_set()
+        
+        # Title
+        title_label = tk.Label(
+            score_window,
+            text="🚗 Driver Performance Report",
+            font=("Helvetica", 16, "bold"),
+            fg="#4FC3F7",
+            bg="#121212"
+        )
+        title_label.pack(pady=20)
+        
+        # Score display
+        score_frame = tk.Frame(score_window, bg="#1E1E1E", relief=tk.RAISED, bd=1)
+        score_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        score_label = tk.Label(
+            score_frame,
+            text=f"Attention Score: {score}%",
+            font=("Helvetica", 24, "bold"),
+            fg=self._get_score_color(score),
+            bg="#1E1E1E"
+        )
+        score_label.pack(pady=10)
+        
+        # Rating
+        rating_label = tk.Label(
+            score_frame,
+            text=f"Rating: {rating}",
+            font=("Helvetica", 14, "bold"),
+            fg="#FFFFFF",
+            bg="#1E1E1E"
+        )
+        rating_label.pack(pady=5)
+        
+        # Details
+        details_frame = tk.Frame(score_window, bg="#121212")
+        details_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        duration_label = tk.Label(
+            details_frame,
+            text=f"Ride Duration: {duration:.1f} minutes",
+            font=("Helvetica", 10),
+            fg="#B0B0B0",
+            bg="#121212"
+        )
+        duration_label.pack(pady=2)
+        
+        readings_label = tk.Label(
+            details_frame,
+            text=f"Attention Readings: {readings}",
+            font=("Helvetica", 10),
+            fg="#B0B0B0",
+            bg="#121212"
+        )
+        readings_label.pack(pady=2)
+        
+        # Offensive language count (only show if any detected)
+        if offensive_count > 0:
+            offensive_label = tk.Label(
+                details_frame,
+                text=f"Offensive Language Incidents: {offensive_count}",
+                font=("Helvetica", 10),
+                fg="#FF5252",
+                bg="#121212"
+            )
+            offensive_label.pack(pady=2)
+        
+        # Description
+        desc_label = tk.Label(
+            score_window,
+            text=self._get_score_description(score, offensive_count),
+            font=("Helvetica", 10),
+            fg="#B0B0B0",
+            bg="#121212",
+            wraplength=350,
+            justify=tk.CENTER
+        )
+        desc_label.pack(pady=10)
+        
+        # Close button
+        close_button = tk.Button(
+            score_window,
+            text="Close",
+            font=("Helvetica", 12, "bold"),
+            fg="#FFFFFF",
+            bg="#4FC3F7",
+            relief=tk.FLAT,
+            command=score_window.destroy
+        )
+        close_button.pack(pady=20)
+        
+        # Center window on screen
+        score_window.update_idletasks()
+        x = (score_window.winfo_screenwidth() // 2) - (score_window.winfo_width() // 2)
+        y = (score_window.winfo_screenheight() // 2) - (score_window.winfo_height() // 2)
+        score_window.geometry(f"+{x}+{y}")
+
+    # Get color based on score
+    def _get_score_color(self, score):
+        if score >= 90:
+            return "#4CAF50"  # Green
+        elif score >= 80:
+            return "#8BC34A"  # Light green
+        elif score >= 70:
+            return "#FFC107"  # Yellow
+        elif score >= 60:
+            return "#FF9800"  # Orange
+        else:
+            return "#F44336"  # Red
+
+    # Get description based on score
+    def _get_score_description(self, score, offensive_count=0):
+        base_description = ""
+        if score >= 90:
+            base_description = "Outstanding attention and focus throughout the ride. This driver maintains exceptional awareness."
+        elif score >= 80:
+            base_description = "Very good attention levels. The driver shows consistent focus with minimal distractions."
+        elif score >= 70:
+            base_description = "Good attention overall. The driver is generally alert but may have occasional lapses."
+        elif score >= 60:
+            base_description = "Average attention. The driver shows moderate focus but could improve awareness."
+        elif score >= 50:
+            base_description = "Below average attention. The driver has noticeable distractions that affect focus."
+        else:
+            base_description = "Poor attention levels. The driver shows significant distractions that compromise safety."
+        
+        # Add offensive language warning if applicable
+        if offensive_count > 0:
+            penalty = min(offensive_count * 5, 30)
+            base_description += f"\n\n⚠️ ATTENTION: {offensive_count} incident(s) of offensive language detected. A penalty of {penalty} point(s) has been applied to the final score."
+        
+        return base_description
+
+    # Configure scroll region
+    def _on_frame_configure(self, event=None):
+        # Update the scroll region to encompass the inner frame
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        
+        # Also update the width of the window to match the canvas width
+        canvas_width = self.canvas.winfo_width()
+        if canvas_width > 1:  # Make sure canvas has been rendered
+            self.canvas.itemconfig(self.canvas_window, width=canvas_width)
+
+        # Show or hide scrollbar based on content size
+        bbox = self.canvas.bbox("all")
+        if bbox:
+            canvas_height = self.canvas.winfo_height()
+            content_height = bbox[3] - bbox[1]
+            if content_height <= canvas_height:
+                self.scrollbar.pack_forget()  # Hide scrollbar if content fits
+            else:
+                self.scrollbar.pack(side="right", fill="y")  # Show scrollbar if content overflows
+
+    # Bind scroll events
+    def _bind_scroll_events(self):
+        # For Windows and MacOS
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
+        # For Linux
+        self.canvas.bind("<Button-4>", self._on_mousewheel)
+        self.canvas.bind("<Button-5>", self._on_mousewheel)
+        
+        # Bind to all child widgets
+        self.scrollable_frame.bind("<MouseWheel>", self._on_mousewheel)
+        self.scrollable_frame.bind("<Button-4>", self._on_mousewheel)
+        self.scrollable_frame.bind("<Button-5>", self._on_mousewheel)
+        
+        # Bind to the main window for resize events
+        self.master.bind("<Configure>", self._on_window_resize)
+
+    # Handle mousewheel scrolling
+    def _on_mousewheel(self, event):
+        # Only scroll if content is larger than view
+        bbox = self.canvas.bbox("all")
+        if bbox and (bbox[3] - bbox[1]) > self.canvas.winfo_height():
+            # For Windows
+            if event.num == 5 or event.delta < 0:
+                self.canvas.yview_scroll(1, "units")
+            elif event.num == 4 or event.delta > 0:
+                self.canvas.yview_scroll(-1, "units")
+            # For Linux
+            elif event.num == 4:
+                self.canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                self.canvas.yview_scroll(1, "units")
+
+    # Handle window resize
+    def _on_window_resize(self, event):
+        # Only respond to the main window resize, not child widgets
+        if event.widget == self.master:
+            self._on_frame_configure()
 
     def on_resize(self, event):
         # Update progress bar when window is resized

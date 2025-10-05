@@ -1,12 +1,14 @@
 # 🚗 SafeRide_AI: Driver Safety Monitoring System
 
-An AI-powered safety system for ride-hailing services like Ola and Uber. It uses YOLO-based computer vision to monitor driver attention, drowsiness levels, phone usage, and speech-to-text analysis to detect offensive or unsafe language, ensuring passenger safety in real-time.
+## Overview
+
+SafeRide_AI is an AI-powered safety system for ride-hailing services like Ola and Uber. It uses YOLO-based computer vision to monitor driver attention, drowsiness levels, phone usage, and speech-to-text analysis to detect offensive or unsafe language, ensuring passenger safety in real-time.
 
 ## 📖 Overview
 
 SafeRide_AI is a **hybrid computer vision and audio processing system** that uses your PC webcam to track a driver's **attention level** and **drowsiness** in real-time. It combines **YOLOv8** for object detection with **MediaPipe** for face and eye analysis to provide comprehensive driver monitoring.
 
-The system outputs a continuous **attention score (0–100)** that reflects how focused the driver is, adjusting dynamically based on various behavioral indicators.
+The system outputs a continuous **attention score (0–100)** that reflects how focused the driver is, adjusting dynamically based on various behavioral indicators. At the end of each ride, it calculates an **average attention score** to provide a **final driver rating** that can help passengers make informed decisions about driver selection.
 
 ## ✨ Features
 
@@ -23,6 +25,12 @@ The system outputs a continuous **attention score (0–100)** that reflects how 
 - **Emergency Alert System**: Sends alerts when dangerous language is detected
 - **Passenger Help Detection**: Detects when passengers ask for help using specific phrases
 - **Offensive Words Logging**: Automatically logs offensive language for reporting to ride-hailing companies
+
+### Ride Performance Analysis
+- **Continuous Attention Scoring**: Real-time attention score (0-100%) throughout the ride
+- **Final Driver Rating**: Average attention score calculated at the end of the ride
+- **Performance Report**: Detailed driver performance report with rating and statistics
+- **Ride Statistics**: Duration, attention readings count, and performance metrics
 
 ## ⚙️ System Pipeline
 
@@ -56,7 +64,7 @@ conda activate saferide_ai
 
 # Or using venv
 python -m venv saferide_ai
-source saferide_ai/bin/activate  # On Windows: saferide_ai\Scripts\activate
+source saferide_ai/Scripts/activate
 ```
 
 ### 2. Install Dependencies
@@ -132,6 +140,7 @@ The system recognizes the following help-related phrases:
 
 ## 📊 Scoring System (Out of 100)
 
+### Real-Time Attention Scoring
 | Factor | Weight/Penalty | Condition |
 |--------|----------------|-----------|
 | Face detected | +25 | Visible in frame |
@@ -148,6 +157,107 @@ The system recognizes the following help-related phrases:
 
 Final score = max(0, min(100, weighted sum))
 
+### Ride Performance Scoring
+At the end of each ride, the system calculates an average of all attention scores to determine the final driver performance rating. This provides a comprehensive assessment of the driver's attentiveness throughout the entire journey.
+
+## 📊 Driver Performance Rating System
+
+At the end of each ride, SafeRide_AI calculates a final driver performance score based on the average attention level throughout the journey. This score helps passengers make informed decisions about driver selection and provides valuable feedback to ride-hailing companies.
+
+### How It Works
+
+1. **Continuous Monitoring**: The system tracks attention levels throughout the entire ride
+2. **Data Collection**: All attention scores are stored and timestamped
+3. **Offensive Language Detection**: The system monitors for offensive language and applies penalties
+4. **Average Calculation**: When the ride ends, an average score is computed with penalties applied
+5. **Rating Assignment**: Drivers receive a rating based on their adjusted score
+6. **Performance Report**: A detailed report is generated with statistics and metrics
+
+### Rating Scale
+
+| Score Range | Rating        | Description |
+|-------------|---------------|-------------|
+| 90-100%     | Excellent     | Outstanding attention and focus throughout the ride |
+| 80-89%      | Very Good     | Very good attention levels with minimal distractions |
+| 70-79%      | Good          | Good attention overall with occasional lapses |
+| 60-69%      | Average       | Average attention with moderate focus |
+| 50-59%      | Below Average | Below average attention with noticeable distractions |
+| 0-49%       | Poor          | Poor attention levels with significant distractions |
+
+### Performance Penalties
+
+The system applies penalties to the final score for inappropriate behavior:
+
+| Infraction | Penalty | Maximum Penalty |
+|------------|---------|-----------------|
+| Offensive Language | -5 points per incident | -30 points total |
+
+### Performance Report Details
+
+The final performance report includes:
+- **Final Attention Score**: Average of all attention readings during the ride (adjusted for penalties)
+- **Driver Rating**: Categorical rating based on the adjusted score
+- **Ride Duration**: Total time of the monitored ride
+- **Attention Readings**: Number of attention level measurements taken
+- **Offensive Language Incidents**: Count of detected offensive language instances
+- **Performance Description**: Detailed explanation of the rating and any penalties applied
+
+This system provides an objective measure of driver attentiveness that can be used by passengers to select drivers and by ride-hailing companies to monitor driver performance.
+
+## 🔄 Model Retraining for Improved Accuracy
+
+To improve the accuracy of object detection (phones, books, laptops), you can retrain the YOLOv8 model with custom data:
+
+### 1. Setup Training Environment
+```bash
+# Install additional dependencies for training
+pip install torch torchvision
+
+# Setup dataset structure
+python src/train_model.py --action setup
+```
+
+### 2. Prepare Your Custom Dataset
+- Organize images in the `datasets/custom_dataset/images/` directory
+- Create corresponding label files in YOLO format in `datasets/custom_dataset/labels/`
+- Split data into train and validation sets (80/20 ratio recommended)
+
+### 3. Train the Model
+```bash
+# Basic training with default parameters
+python src/train_model.py --action train
+
+# Advanced training with custom parameters
+python src/train_model.py --action train --model_size s --epochs 150 --batch_size 32 --img_size 640
+```
+
+### 4. Validate the Trained Model
+```bash
+python src/train_model.py --action validate
+```
+
+### 5. Update the System to Use the New Model
+```bash
+python src/train_model.py --action update --new_model_path path/to/your/best.pt
+```
+
+### Training Parameters
+
+| Parameter | Description | Recommended Value |
+|----------|-------------|-------------------|
+| `model_size` | Model size (n, s, m, l, x) | `s` for balance of speed/accuracy |
+| `epochs` | Number of training iterations | 100-300 |
+| `batch_size` | Images per batch | 16-64 (based on GPU memory) |
+| `img_size` | Input image size | 640 |
+
+### Tips for Better Accuracy
+
+1. **Dataset Quality**: Use high-quality, diverse images with various lighting conditions
+2. **Annotation Accuracy**: Ensure precise bounding box annotations
+3. **Class Balance**: Maintain balanced representation of all object classes
+4. **Data Augmentation**: Enable built-in augmentation in YOLOv8
+5. **Validation**: Always validate on a separate test set
+
 ## 📁 Modules
 
 - `src/detection.py`: Core computer vision algorithms for attention and drowsiness detection
@@ -155,6 +265,7 @@ Final score = max(0, min(100, weighted sum))
 - `src/video.py`: Webcam handling and frame capture
 - `src/gui.py`: Graphical user interface for displaying metrics
 - `src/main.py`: Main application controller
+- `src/train_model.py`: Model training and retraining utilities
 
 ## 📋 Requirements
 
@@ -165,6 +276,7 @@ Final score = max(0, min(100, weighted sum))
 - SpeechRecognition
 - Tkinter (for GUI)
 - NumPy
+- PyTorch (for model training)
 
 ## 📊 Data Logging
 

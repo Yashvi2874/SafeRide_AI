@@ -6,6 +6,7 @@ from audio import SpeechRecognizer
 from detection import detect_attention_and_drowsiness
 import tkinter as tk
 import os
+import time
 
 # Main application class
 class HybridAttentionSpeechApp:
@@ -46,6 +47,12 @@ class HybridAttentionSpeechApp:
         # Track last displayed sentence to avoid duplicates
         self.last_displayed_sentence = ""
         
+        # Driver scoring system
+        self.attention_scores = []  # List to store attention scores
+        self.ride_start_time = time.time()  # Track when the ride started
+        self.ride_end_time = None  # Track when the ride ended
+        self.offensive_language_count = 0  # Track offensive language detections
+        
         # Track if we've shown alerts to prevent continuous display
         self.offensive_alert_shown = False
         self.help_alert_shown = False
@@ -65,6 +72,9 @@ class HybridAttentionSpeechApp:
                     # Old format (3 values)
                     processed_frame, attention_score, drowsiness_alert = result
                     yawning_detected = False
+                
+                # Store attention score for final calculation
+                self.attention_scores.append(attention_score)
                 
                 # Update GUI with attention and drowsiness data
                 self.gui.update_attention(attention_score)
@@ -103,6 +113,8 @@ class HybridAttentionSpeechApp:
             if offensive_detected:
                 # Show offensive alert every time it's detected
                 self.gui.show_offensive_warning("OFFENSIVE LANGUAGE DETECTED!")
+                # Increment offensive language counter
+                self.offensive_language_count += 1
                 
             if help_detected:
                 # Show help alert every time it's detected
@@ -112,25 +124,82 @@ class HybridAttentionSpeechApp:
             # Use shorter delay for more responsive alerts
             cv2.waitKey(50)
 
+    # Calculate final driver score
+    def calculate_final_score(self):
+        if not self.attention_scores:
+            return 0.0
+        
+        # Calculate average attention score
+        avg_score = sum(self.attention_scores) / len(self.attention_scores)
+        
+        # Apply penalty for offensive language
+        # Each offensive language detection reduces the score by 5 points
+        offensive_penalty = min(self.offensive_language_count * 5, 30)  # Max penalty of 30 points
+        adjusted_score = max(0, avg_score - offensive_penalty)
+        
+        # Calculate ride duration in minutes
+        if self.ride_end_time:
+            ride_duration = (self.ride_end_time - self.ride_start_time) / 60
+        else:
+            ride_duration = (time.time() - self.ride_start_time) / 60
+        
+        return round(adjusted_score, 1)
+
+    # Get driver rating description
+    def get_driver_rating(self, score):
+        if score >= 90:
+            return "Excellent"
+        elif score >= 80:
+            return "Very Good"
+        elif score >= 70:
+            return "Good"
+        elif score >= 60:
+            return "Average"
+        elif score >= 50:
+            return "Below Average"
+        else:
+            return "Poor"
+
     # Run the application
     def run(self):
-        # Start video processing in a separate thread
-        video_thread = threading.Thread(target=self.start_video_stream)
-        video_thread.daemon = True
-        video_thread.start()
-        
-        # Start audio processing in a separate thread
-        audio_thread = threading.Thread(target=self.start_audio_transcription)
-        audio_thread.daemon = True
-        audio_thread.start()
-        
-        # Run GUI in main thread
-        self.root.mainloop()
-        
-        # Clean up when GUI is closed
-        self.running = False
-        self.speech_recognizer.stop()
-        self.video_stream.release()
+        try:
+            # Start video processing in a separate thread
+            video_thread = threading.Thread(target=self.start_video_stream)
+            video_thread.daemon = True
+            video_thread.start()
+            
+            # Start audio processing in a separate thread
+            audio_thread = threading.Thread(target=self.start_audio_transcription)
+            audio_thread.daemon = True
+            audio_thread.start()
+            
+            # Run GUI in main thread
+            self.root.mainloop()
+        finally:
+            # Clean up when GUI is closed
+            self.running = False
+            self.ride_end_time = time.time()  # Mark ride end time
+            final_score = self.calculate_final_score()
+            driver_rating = self.get_driver_rating(final_score)
+            ride_duration = (self.ride_end_time - self.ride_start_time) / 60
+            readings = len(self.attention_scores)
+            
+            # Show final score in GUI
+            try:
+                self.gui.show_final_score(final_score, driver_rating, ride_duration, readings, self.offensive_language_count)
+            except:
+                # Fallback to console if GUI is already closed
+                pass
+            
+            # Print final score to console
+            print(f"\n--- Ride Summary ---")
+            print(f"Final Driver Attention Score: {final_score}%")
+            print(f"Driver Rating: {driver_rating}")
+            print(f"Ride Duration: {ride_duration:.1f} minutes")
+            print(f"Total Attention Readings: {readings}")
+            
+            self.speech_recognizer.stop()
+            self.video_stream.release()
 
 # Main entry point
 if __name__ == "__main__":

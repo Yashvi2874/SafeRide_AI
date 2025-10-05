@@ -4,9 +4,12 @@ import numpy as np
 from ultralytics import YOLO
 from collections import deque
 import time
+import os
 
 # Initialize YOLO model for object detection
-model = YOLO("yolov8n.pt")
+# Check for custom trained model first, fallback to default
+model_path = "yolov8n_custom.pt" if os.path.exists("yolov8n_custom.pt") else "yolov8s.pt" if os.path.exists("yolov8s.pt") else "yolov8n.pt"
+model = YOLO(model_path)
 model.overrides['verbose'] = False
 model.overrides['imgsz'] = 320
 
@@ -132,10 +135,52 @@ def is_object_in_hand(hand_landmarks, object_bbox, threshold=100):
         x1, y1, x2, y2 = object_bbox
         obj_center_x = (x1 + x2) / 2
         obj_center_y = (y1 + y2) / 2
-        for lm in hand_landmarks:
-            distance = np.sqrt((lm[0] - obj_center_x)**2 + (lm[1] - obj_center_y)**2)
-            if distance < threshold:
-                return True
+        
+        # Check multiple points on the hand (fingertips and palm center)
+        fingertips = [4, 8, 12, 16, 20]  # Thumb, index, middle, ring, pinky fingertips
+        palm_center = 0  # Palm center landmark
+        
+        # Check if any fingertip or palm center is close to object
+        for idx in fingertips + [palm_center]:
+            if idx < len(hand_landmarks):
+                lm = hand_landmarks[idx]
+                distance = np.sqrt((lm[0] - obj_center_x)**2 + (lm[1] - obj_center_y)**2)
+                if distance < threshold:
+                    return True
+        return False
+    except Exception:
+        return False
+
+# Enhanced hand-phone interaction detection
+def is_phone_in_hand(hand_landmarks, phone_bbox, frame_width, frame_height):
+    """
+    Enhanced detection of phone in hand with multiple criteria
+    """
+    try:
+        x1, y1, x2, y2 = phone_bbox
+        phone_center_x = (x1 + x2) / 2
+        phone_center_y = (y1 + y2) / 2
+        phone_width = x2 - x1
+        phone_height = y2 - y1
+        
+        # Check if phone is in a reasonable position (not too high or too low)
+        if phone_center_y < frame_height * 0.2 or phone_center_y > frame_height * 0.8:
+            return False
+            
+        # Check multiple hand points
+        fingertips = [4, 8, 12, 16, 20]  # Thumb, index, middle, ring, pinky fingertips
+        palm_center = 0  # Palm center landmark
+        
+        # Adaptive threshold based on phone size
+        adaptive_threshold = max(phone_width, phone_height) * 0.8
+        
+        # Check if any hand point is close to phone
+        for idx in fingertips + [palm_center]:
+            if idx < len(hand_landmarks):
+                lm = hand_landmarks[idx]
+                distance = np.sqrt((lm[0] - phone_center_x)**2 + (lm[1] - phone_center_y)**2)
+                if distance < adaptive_threshold:
+                    return True
         return False
     except Exception:
         return False
@@ -191,6 +236,18 @@ yawning = False
 # Phone detection state
 phone_detected = False
 hand_on_phone = False
+phone_usage_counter = 0  # Counter for persistent phone usage detection
+PHONE_USAGE_THRESHOLD = 2  # Further reduced frames needed to confirm phone usage
+
+# Additional phone detection variables
+phone_confidence_history = deque(maxlen=5)  # Track recent phone confidences
+last_phone_detection_time = 0
+PHONE_DETECTION_TIMEOUT = 2.0  # seconds
+
+# Enhanced phone detection parameters
+PHONE_CONFIDENCE_THRESHOLD = 0.15  # Lower threshold for better detection
+MIN_PHONE_SIZE = 50  # Minimum phone size in pixels
+MAX_PHONE_SIZE = 300  # Maximum phone size in pixels
 
 # Attention recovery system
 RECOVERY_RATE = 0.8
@@ -206,7 +263,7 @@ def detect_attention_and_drowsiness(frame, speech_recognizer=None):
     global attention_scores, previous_hand_positions, fidget_start_time
     global fidget_active, fidget_penalty_active, playing_with_object
     global ear_counter, mar_counter, drowsy, drowsy_warning, recovery_mode, recovery_score
-    global phone_detected, hand_on_phone, yawning
+    global phone_detected, hand_on_phone, phone_usage_counter, yawning, last_phone_detection_time
     
     frame = cv2.flip(frame, 1)
     frame = cv2.resize(frame, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
@@ -217,24 +274,55 @@ def detect_attention_and_drowsiness(frame, speech_recognizer=None):
     distractions = []
     object_bboxes = {}
     cell_phone_detected = False
+    phone_confidences = []  # Track phone detection confidences
+    current_time = time.time()
 
     for r in yolo_results:
         for box in r.boxes:
             cls = model.names[int(box.cls)]
             confidence = float(box.conf[0])
-            if cls == "cell phone" and confidence > 0.3:
-                cell_phone_detected = True
-                phone_detected = True
-                distractions.append(cls)
+            
+            # Enhanced phone detection
+            if cls == "cell phone":
+                # Get bounding box coordinates
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
-                object_bboxes[cls] = (x1, y1, x2, y2)
-            elif cls in object_classes and confidence > 0.5:
+                width = x2 - x1
+                height = y2 - y1
+                
+                # Check if phone size is reasonable
+                if MIN_PHONE_SIZE <= width <= MAX_PHONE_SIZE and MIN_PHONE_SIZE <= height <= MAX_PHONE_SIZE:
+                    phone_confidences.append(confidence)
+                    # Use adaptive threshold based on recent detections
+                    threshold = PHONE_CONFIDENCE_THRESHOLD
+                    if len(phone_confidence_history) > 0:
+                        avg_confidence = sum(phone_confidence_history) / len(phone_confidence_history)
+                        threshold = max(PHONE_CONFIDENCE_THRESHOLD, avg_confidence * 0.7)
+                    
+                    if confidence > threshold:
+                        cell_phone_detected = True
+                        phone_detected = True
+                        distractions.append(cls)
+                        object_bboxes[cls] = (x1, y1, x2, y2)
+                        
+                        # Update confidence history
+                        phone_confidence_history.append(confidence)
+                        last_phone_detection_time = current_time
+            elif cls in object_classes and confidence > 0.3:
                 distractions.append(cls)
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 object_bboxes[cls] = (x1, y1, x2, y2)
     
+    # More responsive phone detection reset with timeout
     if not cell_phone_detected:
-        phone_detected = False
+        # Only reset if no phone detected for a while or confidence is very low
+        time_since_last_detection = current_time - last_phone_detection_time
+        if time_since_last_detection > PHONE_DETECTION_TIMEOUT or len(phone_confidences) == 0:
+            phone_detected = False
+            phone_usage_counter = max(0, phone_usage_counter - 2)  # Faster decay
+        hand_on_phone = (phone_usage_counter >= PHONE_USAGE_THRESHOLD)
+    else:
+        # Update last detection time
+        last_phone_detection_time = current_time
 
     # Face mesh detection
     face_detected = False
@@ -266,6 +354,19 @@ def detect_attention_and_drowsiness(frame, speech_recognizer=None):
             
             yawning = mar_counter >= YAWN_CONSEC_FRAMES
             looking_at_screen = get_gaze_direction(face_landmarks_list, w, h)
+            
+            # Draw face mesh landmarks
+            if mp_drawing and hasattr(mp_drawing, 'draw_landmarks'):
+                try:
+                    mp_drawing.draw_landmarks(
+                        frame, 
+                        face_landmarks, 
+                        getattr(mp_face_mesh, 'FACEMESH_CONTOURS', None),
+                        mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=1, circle_radius=1),
+                        mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=1, circle_radius=1)
+                    )
+                except Exception:
+                    pass
     
     # Drowsiness detection
     if face_detected:
@@ -294,6 +395,8 @@ def detect_attention_and_drowsiness(frame, speech_recognizer=None):
         
         if hand_results.multi_hand_landmarks:
             hands_detected = True
+            hand_on_phone_current = False
+            
             for hand_landmarks in hand_results.multi_hand_landmarks:
                 hand_lm_list = [(lm.x * w, lm.y * h) for lm in hand_landmarks.landmark]
                 current_hand_positions.append(hand_lm_list)
@@ -303,11 +406,44 @@ def detect_attention_and_drowsiness(frame, speech_recognizer=None):
                     if hand_near_face:
                         break
                 
+                # Check if hand is on phone (only if phone is detected)
                 if phone_detected and object_bboxes.get("cell phone"):
-                    hand_on_phone = is_object_in_hand(hand_lm_list, object_bboxes["cell phone"])
+                    # Try both methods for better detection
+                    method1 = is_object_in_hand(hand_lm_list, object_bboxes["cell phone"])
+                    method2 = is_phone_in_hand(hand_lm_list, object_bboxes["cell phone"], w, h)
+                    if method1 or method2:
+                        hand_on_phone_current = True
+                
+                # Draw hand landmarks
+                if mp_drawing and hasattr(mp_drawing, 'draw_landmarks'):
+                    try:
+                        mp_drawing.draw_landmarks(
+                            frame, 
+                            hand_landmarks, 
+                            getattr(mp_hands, 'HAND_CONNECTIONS', None),
+                            mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2, circle_radius=2),
+                            mp_drawing.DrawingSpec(color=(255, 255, 0), thickness=2, circle_radius=2)
+                        )
+                    except Exception:
+                        pass
+            
+            # More responsive hand-on-phone state update
+            if hand_on_phone_current:
+                phone_usage_counter = min(phone_usage_counter + 1, PHONE_USAGE_THRESHOLD + 2)  # Allow slightly higher counter
+            else:
+                phone_usage_counter = max(0, phone_usage_counter - 1)
+            
+            # More responsive hand_on_phone detection
+            hand_on_phone = (phone_usage_counter >= PHONE_USAGE_THRESHOLD) or (hand_on_phone and phone_usage_counter >= 1)
         else:
-            hand_on_phone = False
+            # Decay faster when no hands detected
+            phone_usage_counter = max(0, phone_usage_counter - 2)
+            # Keep hand_on_phone state for a short time to avoid flickering
+            if phone_usage_counter < PHONE_USAGE_THRESHOLD - 1:
+                hand_on_phone = False
     else:
+        # Decay even faster when no hands detected
+        phone_usage_counter = max(0, phone_usage_counter - 3)
         hand_on_phone = False
 
     # Attention scoring
@@ -339,6 +475,7 @@ def detect_attention_and_drowsiness(frame, speech_recognizer=None):
     if hand_near_face:
         score -= 15
         
+    # Apply phone usage penalty only when hand is confirmed on phone
     if hand_on_phone:
         score -= 30
         
@@ -371,15 +508,37 @@ def detect_attention_and_drowsiness(frame, speech_recognizer=None):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
         y_pos += 30
     
-    if phone_detected:
+    # Show phone usage alert with better visibility
+    if phone_detected and hand_on_phone:
         cv2.putText(frame, "LOW ATTENTION (ON CALL)", (10, y_pos),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 165, 0), 2)
+        y_pos += 30
+    elif phone_detected:
+        cv2.putText(frame, "PHONE DETECTED", (10, y_pos),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
+        # Show confidence levels for debugging
+        if phone_confidences:
+            conf_text = f"Conf: {', '.join([f'{c:.2f}' for c in phone_confidences[:3]])}"
+            cv2.putText(frame, conf_text, (10, y_pos + 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            # Show phone size for debugging
+            if "cell phone" in object_bboxes:
+                x1, y1, x2, y2 = object_bboxes["cell phone"]
+                size_text = f"Size: {x2-x1}x{y2-y1}"
+                cv2.putText(frame, size_text, (10, y_pos + 50),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
     # Draw object detection boxes
     for obj_name, bbox in object_bboxes.items():
         x1, y1, x2, y2 = bbox
         if obj_name == "cell phone":
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            color = (0, 0, 255) if hand_on_phone else (255, 255, 0)  # Red if in hand, yellow if detected
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+            # Add confidence text
+            if phone_confidences:
+                conf_text = f"Phone: {max(phone_confidences):.2f}"
+                cv2.putText(frame, conf_text, (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
         else:
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 100, 255), 2)
 
