@@ -43,7 +43,11 @@ class HybridAttentionSpeechGUI:
 
         # Offensive warning label
         self.offensive_warning_label = tk.Label(master, text="", font=("Helvetica", 12, "bold"), fg="red")
-        self.offensive_warning_label.pack(pady=10)
+        self.offensive_warning_label.pack(pady=5)
+        
+        # Help warning label
+        self.help_warning_label = tk.Label(master, text="", font=("Helvetica", 12, "bold"), fg="orange")
+        self.help_warning_label.pack(pady=5)
 
     # Update attention display
     def update_attention(self, attention):
@@ -89,6 +93,12 @@ class HybridAttentionSpeechGUI:
         self.offensive_warning_label.config(text=message)
         # Auto-clear the warning after 5 seconds
         self.master.after(5000, lambda: self.offensive_warning_label.config(text=""))
+    
+    # Show help request warning
+    def show_help_warning(self, message):
+        self.help_warning_label.config(text=message)
+        # Auto-clear the warning after 5 seconds
+        self.master.after(5000, lambda: self.help_warning_label.config(text=""))
 
 # Main entry point
 def main():

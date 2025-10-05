@@ -22,13 +22,16 @@ class SpeechRecognizer:
       - speech_text: last completed sentence (str)
       - partial_text: last partial chunk (str)
       - offensive_detected: bool
+      - help_detected: bool
     """
-    def __init__(self, offensive_words=None, webhook_url=None,
+    def __init__(self, offensive_words=None, help_words=None, webhook_url=None,
                  phrase_time_limit=3, silence_flush_sec=0.8,
                  fuzzy_threshold=0.75, alert_cooldown=60):
         self.offensive_words = [w.strip().lower() for w in (offensive_words or []) if w.strip()]
+        self.help_words = [w.strip().lower() for w in (help_words or []) if w.strip()]
         # compile regex patterns with word boundaries for exact/phrase matches
         self._regexes = [re.compile(r"\b" + re.escape(p) + r"\b", re.IGNORECASE) for p in self.offensive_words]
+        self._help_regexes = [re.compile(r"\b" + re.escape(p) + r"\b", re.IGNORECASE) for p in self.help_words]
         self.webhook_url = webhook_url
         self.phrase_time_limit = phrase_time_limit
         self.silence_flush_sec = silence_flush_sec
@@ -45,24 +48,31 @@ class SpeechRecognizer:
         self.speech_text = ""
         self.partial_text = ""
         self.offensive_detected = False
+        self.help_detected = False
 
         self._buffer = []
         self._lock = threading.Lock()
         self._flush_timer = None
         self._stop_listening = None
         self._last_alert_time = 0.0
+        self._last_help_alert_time = 0.0
 
     # Send alert via webhook
-    def _alert_webhook(self, sentence):
+    def _alert_webhook(self, sentence, event_type="offensive_speech"):
         now = time.time()
         if not self.webhook_url:
             return
-        if now - self._last_alert_time < self.alert_cooldown:
+        # Use different cooldowns for different alert types
+        last_alert_time = self._last_alert_time if event_type == "offensive_speech" else self._last_help_alert_time
+        if now - last_alert_time < self.alert_cooldown:
             return
         try:
-            payload = {"event": "offensive_speech", "text": sentence, "timestamp": now}
+            payload = {"event": event_type, "text": sentence, "timestamp": now}
             requests.post(self.webhook_url, json=payload, timeout=3)
-            self._last_alert_time = now
+            if event_type == "offensive_speech":
+                self._last_alert_time = now
+            else:
+                self._last_help_alert_time = now
         except Exception:
             pass
 
@@ -78,42 +88,79 @@ class SpeechRecognizer:
 
             # Offensive detection: regex, substring/token, then fuzzy
             lower = sentence.lower()
-            detected = False
+            offensive_detected = False
+            help_detected = False
 
-            # 1) regex (word/phrase) exact matches
+            # 1) regex (word/phrase) exact matches for offensive words
             for rx in self._regexes:
                 if rx.search(sentence):
-                    detected = True
+                    offensive_detected = True
                     break
 
-            # 2) substring / token check (catch single words inside sentences)
-            if not detected and self.offensive_words:
+            # 2) regex (word/phrase) exact matches for help words
+            for rx in self._help_regexes:
+                if rx.search(sentence):
+                    help_detected = True
+                    break
+
+            # 3) substring / token check for offensive words (catch single words inside sentences)
+            if not offensive_detected and self.offensive_words:
                 # token list
                 tokens = re.findall(r"\w+", lower)
                 for phrase in self.offensive_words:
                     if " " in phrase:
                         # multiword phrase -> substring search
                         if phrase in lower:
-                            detected = True
+                            offensive_detected = True
                             break
                     else:
                         # single word -> token membership
                         if phrase in tokens:
-                            detected = True
+                            offensive_detected = True
                             break
 
-            # 3) fuzzy fallback
-            if not detected and self.offensive_words:
+            # 4) substring / token check for help words (catch single words inside sentences)
+            if not help_detected and self.help_words:
+                # token list
+                tokens = re.findall(r"\w+", lower)
+                for phrase in self.help_words:
+                    if " " in phrase:
+                        # multiword phrase -> substring search
+                        if phrase in lower:
+                            help_detected = True
+                            break
+                    else:
+                        # single word -> token membership
+                        if phrase in tokens:
+                            help_detected = True
+                            break
+
+            # 5) fuzzy fallback for offensive words
+            if not offensive_detected and self.offensive_words:
                 for phrase in self.offensive_words:
                     ratio = difflib.SequenceMatcher(None, phrase.lower(), lower).ratio()
                     if ratio >= self.fuzzy_threshold:
-                        detected = True
+                        offensive_detected = True
                         break
 
-            if detected and not self.offensive_detected:
+            # 6) fuzzy fallback for help words
+            if not help_detected and self.help_words:
+                for phrase in self.help_words:
+                    ratio = difflib.SequenceMatcher(None, phrase.lower(), lower).ratio()
+                    if ratio >= self.fuzzy_threshold:
+                        help_detected = True
+                        break
+
+            if offensive_detected and not self.offensive_detected:
                 # only alert on new detection
-                self._alert_webhook(sentence)
-            self.offensive_detected = detected
+                self._alert_webhook(sentence, "offensive_speech")
+            
+            if help_detected and not self.help_detected:
+                # only alert on new detection
+                self._alert_webhook(sentence, "help_requested")
+
+            self.offensive_detected = offensive_detected
+            self.help_detected = help_detected
 
     # Schedule buffer flush
     def _schedule_flush(self):

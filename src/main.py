@@ -12,6 +12,14 @@ class HybridAttentionSpeechApp:
     def __init__(self):
         self.video_stream = VideoCapture()
         
+        # Help-related phrases that trigger alerts
+        help_phrases = [
+            "help", "police", "stop the car", "stop car", "emergency", 
+            "danger", "call police", "get help", "need help", "help me",
+            "pull over", "stop the vehicle", "emergency stop", "dangerous",
+            "unsafe", "scared", "afraid", "threat", "assault", "harassment"
+        ]
+        
         # Initialize speech recognizer
         self.speech_recognizer = SpeechRecognizer(
             offensive_words=[
@@ -19,6 +27,7 @@ class HybridAttentionSpeechApp:
                 "kill", "rape", "murder", "assault", "threat",
                 "shoot", "gun", "attack", "hurt"
             ],
+            help_words=help_phrases,
             webhook_url=os.environ.get("OFFENSIVE_ALERT_WEBHOOK"),
             phrase_time_limit=3,
             silence_flush_sec=0.8,
@@ -33,6 +42,9 @@ class HybridAttentionSpeechApp:
         
         # Control flag
         self.running = True
+        
+        # Track last displayed sentence to avoid duplicates
+        self.last_displayed_sentence = ""
 
     # Process video stream
     def start_video_stream(self):
@@ -69,11 +81,19 @@ class HybridAttentionSpeechApp:
             # We just need to read them and update the GUI
             speech_text = self.speech_recognizer.speech_text or self.speech_recognizer.partial_text or ""
             offensive_detected = self.speech_recognizer.offensive_detected
+            help_detected = self.speech_recognizer.help_detected
             
-            # Update GUI with transcription data
-            self.gui.update_transcription(speech_text)
+            # Only update GUI if we have a new sentence
+            if speech_text and speech_text != self.last_displayed_sentence:
+                # Update GUI with transcription data
+                self.gui.update_transcription(speech_text)
+                self.last_displayed_sentence = speech_text
+                
             if offensive_detected:
                 self.gui.show_offensive_warning("Offensive language detected!")
+            
+            if help_detected:
+                self.gui.show_help_warning("PASSENGER ASKING FOR HELP!")
             
             # Small delay to prevent excessive CPU usage
             cv2.waitKey(100)
