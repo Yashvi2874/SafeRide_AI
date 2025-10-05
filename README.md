@@ -114,13 +114,10 @@ python src/main.py
 
 ### Help Phrases Detected
 
-The system recognizes the following help-related phrases:
-
 **help, police, stop the car, stop car, emergency, danger, call police, get help, need help, help me, pull over, stop the vehicle, emergency stop, dangerous, unsafe, scared, afraid, threat, assault, harassment**
 
-## 📊 Scoring System (Out of 100)
+## 📊 Real-Time Attention Scoring (Out of 100)
 
-### Real-Time Attention Scoring
 | Factor | Weight/Penalty | Condition |
 |--------|----------------|-----------|
 | Face detected | +25 | Visible in frame |
@@ -136,9 +133,6 @@ The system recognizes the following help-related phrases:
 | Eyes closing | -20 | Eyes closed ≥0.25s |
 
 Final score = max(0, min(100, weighted sum))
-
-### Ride Performance Scoring
-At the end of each ride, the system calculates an average of all attention scores to determine the final driver performance rating. This provides a comprehensive assessment of the driver's attentiveness throughout the entire journey.
 
 ## 📊 Driver Performance Rating System
 
