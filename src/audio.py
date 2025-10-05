@@ -3,6 +3,8 @@ import time
 import re
 import requests
 import difflib
+import os
+from datetime import datetime
 
 # Import speech recognition library
 try:
@@ -56,6 +58,16 @@ class SpeechRecognizer:
         self._stop_listening = None
         self._last_alert_time = 0.0
         self._last_help_alert_time = 0.0
+        
+        # Initialize offensive words log file
+        self.log_file = "offensive_words_log.txt"
+        self._initialize_log_file()
+    
+    # Initialize log file with header
+    def _initialize_log_file(self):
+        if not os.path.exists(self.log_file):
+            with open(self.log_file, 'w') as f:
+                f.write("Timestamp,Offensive_Words_Detected,Sentence\n")
 
     # Send alert via webhook
     def _alert_webhook(self, sentence, event_type="offensive_speech"):
@@ -154,6 +166,8 @@ class SpeechRecognizer:
             if offensive_detected and not self.offensive_detected:
                 # only alert on new detection
                 self._alert_webhook(sentence, "offensive_speech")
+                # Log offensive words
+                self._log_offensive_words(sentence)
             
             if help_detected and not self.help_detected:
                 # only alert on new detection
@@ -161,6 +175,23 @@ class SpeechRecognizer:
 
             self.offensive_detected = offensive_detected
             self.help_detected = help_detected
+    
+    # Log offensive words to file
+    def _log_offensive_words(self, sentence):
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Find which offensive words were detected
+            detected_words = []
+            lower_sentence = sentence.lower()
+            for word in self.offensive_words:
+                if word in lower_sentence:
+                    detected_words.append(word)
+            
+            # Write to log file
+            with open(self.log_file, 'a') as f:
+                f.write(f"{timestamp},{';'.join(detected_words)},\"{sentence}\"\n")
+        except Exception:
+            pass
 
     # Schedule buffer flush
     def _schedule_flush(self):

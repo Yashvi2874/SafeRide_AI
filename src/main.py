@@ -45,6 +45,10 @@ class HybridAttentionSpeechApp:
         
         # Track last displayed sentence to avoid duplicates
         self.last_displayed_sentence = ""
+        
+        # Track if we've shown alerts to prevent continuous display
+        self.offensive_alert_shown = False
+        self.help_alert_shown = False
 
     # Process video stream
     def start_video_stream(self):
@@ -66,11 +70,17 @@ class HybridAttentionSpeechApp:
                 self.gui.update_attention(attention_score)
                 self.gui.update_drowsiness(drowsiness_alert)
                 
-                # Display the processed frame
-                cv2.imshow("Enhanced Attention Tracking System", processed_frame)
+                # Update video display in GUI
+                self.gui.update_video(processed_frame)
+                
+                # Update GUI to refresh display
+                self.root.update_idletasks()
+                self.root.update()
             
             # Use a shorter wait time for more responsive UI
-            if cv2.waitKey(1) & 0xFF == 27:  # ESC to quit
+            # Check for ESC key press without displaying separate window
+            key = cv2.waitKey(1) & 0xFF
+            if key == 27:  # ESC to quit
                 self.running = False
                 break
 
@@ -89,14 +99,18 @@ class HybridAttentionSpeechApp:
                 self.gui.update_transcription(speech_text)
                 self.last_displayed_sentence = speech_text
                 
+            # ALWAYS check for offensive language and help requests - FIXED LOGIC
             if offensive_detected:
-                self.gui.show_offensive_warning("Offensive language detected!")
-            
+                # Show offensive alert every time it's detected
+                self.gui.show_offensive_warning("OFFENSIVE LANGUAGE DETECTED!")
+                
             if help_detected:
+                # Show help alert every time it's detected
                 self.gui.show_help_warning("PASSENGER ASKING FOR HELP!")
             
             # Small delay to prevent excessive CPU usage
-            cv2.waitKey(100)
+            # Use shorter delay for more responsive alerts
+            cv2.waitKey(50)
 
     # Run the application
     def run(self):
@@ -117,7 +131,6 @@ class HybridAttentionSpeechApp:
         self.running = False
         self.speech_recognizer.stop()
         self.video_stream.release()
-        cv2.destroyAllWindows()
 
 # Main entry point
 if __name__ == "__main__":

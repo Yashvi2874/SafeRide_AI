@@ -1,6 +1,6 @@
 # 🚗 SafeRide_AI: Driver Safety Monitoring System
 
-An AI-powered safety system for ride-hailing services like Ola and Uber. It uses YOLO-based computer vision to monitor driver attention, drowsiness levels, phone usage, and yawning detection, and speech-to-text analysis to detect offensive or unsafe language, ensuring passenger safety in real-time.
+An AI-powered safety system for ride-hailing services like Ola and Uber. It uses YOLO-based computer vision to monitor driver attention, drowsiness levels, phone usage, and speech-to-text analysis to detect offensive or unsafe language, ensuring passenger safety in real-time.
 
 ## 📖 Overview
 
@@ -21,6 +21,8 @@ The system outputs a continuous **attention score (0–100)** that reflects how 
 - **Speech-to-Text Transcription**: Real-time transcription of driver's speech
 - **Offensive Language Detection**: Identifies and flags offensive or unsafe language
 - **Emergency Alert System**: Sends alerts when dangerous language is detected
+- **Passenger Help Detection**: Detects when passengers ask for help using specific phrases
+- **Offensive Words Logging**: Automatically logs offensive language for reporting to ride-hailing companies
 
 ## ⚙️ System Pipeline
 
@@ -101,6 +103,32 @@ python src/main.py
 - Transcribes spoken words in real-time using Google's Speech-to-Text API
 - Detects offensive or dangerous language through pattern matching
 - Sends webhook alerts when inappropriate speech is detected
+- Logs offensive words for reporting to ride-hailing companies (Ola/Uber)
+- **Passenger Help Detection**: Identifies when passengers request help using specific phrases like "help", "police", "stop the car", etc.
+
+### Help Phrases Detected
+
+The system recognizes the following help-related phrases:
+- help
+- police
+- stop the car
+- stop car
+- emergency
+- danger
+- call police
+- get help
+- need help
+- help me
+- pull over
+- stop the vehicle
+- emergency stop
+- dangerous
+- unsafe
+- scared
+- afraid
+- threat
+- assault
+- harassment
 
 ## 📊 Scoring System (Out of 100)
 
@@ -123,7 +151,7 @@ Final score = max(0, min(100, weighted sum))
 ## 📁 Modules
 
 - `src/detection.py`: Core computer vision algorithms for attention and drowsiness detection
-- `src/audio.py`: Speech recognition and offensive language detection
+- `src/audio.py`: Speech recognition, offensive language detection, and logging
 - `src/video.py`: Webcam handling and frame capture
 - `src/gui.py`: Graphical user interface for displaying metrics
 - `src/main.py`: Main application controller
@@ -137,6 +165,22 @@ Final score = max(0, min(100, weighted sum))
 - SpeechRecognition
 - Tkinter (for GUI)
 - NumPy
+
+## 📊 Data Logging
+
+The system automatically logs offensive words detected from the driver's speech to a file named `offensive_words_log.txt`. This log includes:
+- Timestamp of detection
+- Specific offensive words detected
+- Full sentence containing the offensive language
+
+### Log File Format
+
+The log file is in CSV format with the following columns:
+- `Timestamp`: Date and time of detection
+- `Offensive_Words_Detected`: Semicolon-separated list of offensive words found
+- `Sentence`: The full sentence that contained offensive language
+
+This data can be provided to ride-hailing companies like Ola or Uber for driver accountability and safety monitoring.
 
 ## 👤 Author
 
