@@ -1,6 +1,6 @@
 # 🚗 SafeRide_AI: Driver Safety Monitoring System
 
-An AI-powered safety system for ride-hailing services like Ola and Uber. It uses YOLO-based computer vision to monitor driver attention, drowsiness levels, phone usage, and yawning detection, and speech-to-text analysis to detect offensive or unsafe language, ensuring passenger safety in real-time.
+An AI-powered safety system for ride-hailing services like Ola and Uber. It uses YOLO-based computer vision to monitor driver attention, drowsiness levels, phone usage, and speech-to-text analysis to detect offensive or unsafe language, ensuring passenger safety in real-time.
 
 ## 📖 Overview
 
