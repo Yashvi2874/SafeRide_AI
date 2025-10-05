@@ -278,4 +278,4 @@ This data can be provided to ride-hailing companies like Ola or Uber for driver 
 
 ## 👤 Author
 
-**SafeRide_AI Development Team**
+**Yashasvi Gupta**
