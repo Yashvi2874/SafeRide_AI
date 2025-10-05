@@ -1,5 +1,5 @@
 # 🚗 SafeRide_AI: Driver Safety Monitoring System
-
+![Dashboard GUI](datasets/custom_dataset/images/train/Dashboard_GUI.png)
 ## 📖 Overview
 
 SafeRide_AI is an AI-powered safety system for ride-hailing services like Ola and Uber. It uses YOLO-based computer vision to monitor driver attention, drowsiness levels, phone usage, and speech-to-text analysis to detect offensive or unsafe language, ensuring passenger safety in real-time.
@@ -29,14 +29,6 @@ The system outputs a continuous **attention score (0–100)** that reflects how 
 - **Final Driver Rating**: Average attention score calculated at the end of the ride
 - **Performance Report**: Detailed driver performance report with rating and statistics
 - **Ride Statistics**: Duration, attention readings count, and performance metrics
-
-## 🖼️ Screenshots
-
-### Dashboard GUI
-![Dashboard GUI](datasets/custom_dataset/images/train/Dashboard_GUI.png)
-
-### Terminal Output
-![Terminal Output](datasets/custom_dataset/images/train/Terminal_Output.png)
 
 ## 🔄 System Workflow
 
@@ -192,7 +184,9 @@ The final performance report includes:
 
 This system provides an objective measure of driver attentiveness that can be used by passengers to select drivers and by ride-hailing companies to monitor driver performance.
 
-## 🔄 Model Retraining for Improved Accuracy
+![Terminal Output](datasets/custom_dataset/images/train/Terminal_Output.png)
+
+## 🔄 Model Retraining for Improving Accuracy
 
 To improve the accuracy of object detection (phones, books, laptops), you can retrain the YOLOv8 model with custom data:
 
